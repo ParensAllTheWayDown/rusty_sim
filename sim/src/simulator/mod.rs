@@ -192,11 +192,20 @@ impl Simulation {
         self.messages.push(message);
     }
 
+
+    /// Calculate the minimum next event time of all models in simulation.
     pub fn until_next_event(&self) -> f64 {
         // until_next_event = self.models().iter().fold(INFINITY, |min, model| {
         //     f64::min(min, model.until_next_event())
         // })
         self.models.iter().map(|model|model.until_next_event()).reduce(f64::min).unwrap().min(f64::INFINITY)
+    }
+
+    /// advance the time for all models in the simulation
+    pub fn time_advance(&mut self, time_delta: f64) {
+        self.models().iter_mut().for_each(|model| {
+            model.time_advance(time_delta)
+        })
     }
 
     /// The simulation step is foundational for a discrete event simulation.
@@ -235,12 +244,12 @@ impl Simulation {
             true => self.until_next_event(),
             _ => 0.0f64,
         };
+        self.time_advance(until_next_event);
 
-        self.models().iter_mut().for_each(|model| {
-            model.time_advance(until_next_event);
-        });
+
         self.services
             .set_global_time(self.services.global_time() + until_next_event);
+
         let errors: Result<Vec<()>, SimulationError> = (0..self.models.len())
             .map(|model_index| -> Result<(), SimulationError> {
                 if self.models[model_index].until_next_event() == 0.0 {
