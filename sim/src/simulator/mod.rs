@@ -192,6 +192,13 @@ impl Simulation {
         self.messages.push(message);
     }
 
+    pub fn until_next_event(&self) -> f64 {
+        // until_next_event = self.models().iter().fold(INFINITY, |min, model| {
+        //     f64::min(min, model.until_next_event())
+        // })
+        self.models.iter().map(|model|model.until_next_event()).reduce(f64::min).unwrap().min(f64::INFINITY)
+    }
+
     /// The simulation step is foundational for a discrete event simulation.
     /// This method executes a single discrete event simulation step,
     /// including internal state transitions, external state transitions,
@@ -224,14 +231,11 @@ impl Simulation {
             })?;
         }
         // Process internal events and gather associated messages
-        let until_next_event: f64;
-        if self.messages.is_empty() {
-            until_next_event = self.models().iter().fold(INFINITY, |min, model| {
-                f64::min(min, model.until_next_event())
-            });
-        } else {
-            until_next_event = 0.0;
-        }
+        let until_next_event: f64 = match self.messages.is_empty() {
+            true => self.until_next_event(),
+            _ => 0.0f64,
+        };
+
         self.models().iter_mut().for_each(|model| {
             model.time_advance(until_next_event);
         });
