@@ -14,12 +14,10 @@
 //! return the messages generated during the execution of the simulation
 //! step(s), for use in message analysis.
 
-use std::f64::INFINITY;
-
 use serde::{Deserialize, Serialize};
 
-use crate::input_modeling::dynamic_rng::SimulationRng;
 use crate::input_modeling::dyn_rng;
+use crate::input_modeling::dynamic_rng::SimulationRng;
 use crate::models::{DevsModel, Model, ModelMessage, ModelRecord, Reportable};
 use crate::utils::errors::SimulationError;
 use crate::utils::set_panic_hook;
@@ -192,20 +190,38 @@ impl Simulation {
         self.messages.push(message);
     }
 
-
     /// Calculate the minimum next event time of all models in simulation.
     pub fn until_next_event(&self) -> f64 {
         // until_next_event = self.models().iter().fold(INFINITY, |min, model| {
         //     f64::min(min, model.until_next_event())
         // })
-        self.models.iter().map(|model|model.until_next_event()).reduce(f64::min).unwrap().min(f64::INFINITY)
+        self.models
+            .iter()
+            .map(|model| model.until_next_event())
+            .reduce(f64::min)
+            .unwrap()
+            .min(f64::INFINITY)
     }
 
     /// advance the time for all models in the simulation
     pub fn time_advance(&mut self, time_delta: f64) {
-        self.models().iter_mut().for_each(|model| {
-            model.time_advance(time_delta)
-        })
+        self.models()
+            .iter_mut()
+            .for_each(|model| model.time_advance(time_delta))
+    }
+
+    pub fn messages_for_model(&mut self, model: &Model) -> Vec<ModelMessage> {
+        self.messages
+            .iter()
+            .filter_map(|message| match message.target_id() == model.id() {
+                true => Some(
+                    ModelMessage {
+                        port_name: message.target_port().to_string(),
+                        content: message.content().to_string(),
+                    }),
+                false => None,
+            })
+            .collect()
     }
 
     /// The simulation step is foundational for a discrete event simulation.
@@ -218,20 +234,15 @@ impl Simulation {
         let mut next_messages: Vec<Message> = Vec::new();
         // Process external events
         if !messages.is_empty() {
+            // want a zip between model and messages.
+            // Want a model here rather than index to model.
             (0..self.models.len()).try_for_each(|model_index| -> Result<(), SimulationError> {
-                let model_messages: Vec<ModelMessage> = messages
-                    .iter()
-                    .filter_map(|message| {
-                        if message.target_id() == self.models[model_index].id() {
-                            Some(ModelMessage {
-                                port_name: message.target_port().to_string(),
-                                content: message.content().to_string(),
-                            })
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
+                // Collect up all the messages that target the model identified by model_index.
+
+                // I don't like this because of the clone can't do that
+                let mm = self.models()[model_index].clone();
+                let model_messages: Vec<ModelMessage> = self.messages_for_model(&mm);
+
                 model_messages
                     .iter()
                     .try_for_each(|model_message| -> Result<(), SimulationError> {
@@ -239,13 +250,13 @@ impl Simulation {
                     })
             })?;
         }
+
         // Process internal events and gather associated messages
         let until_next_event: f64 = match self.messages.is_empty() {
             true => self.until_next_event(),
             _ => 0.0f64,
         };
         self.time_advance(until_next_event);
-
 
         self.services
             .set_global_time(self.services.global_time() + until_next_event);
