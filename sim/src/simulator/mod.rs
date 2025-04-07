@@ -14,6 +14,7 @@
 //! return the messages generated during the execution of the simulation
 //! step(s), for use in message analysis.
 
+use itertools::iproduct;
 use serde::{Deserialize, Serialize};
 
 use crate::input_modeling::dyn_rng;
@@ -41,6 +42,16 @@ pub struct Simulation {
     connectors: Vec<Connector>,
     messages: Vec<Message>,
     services: Services,
+}
+
+struct MessageModelPair {
+    model_index: usize,
+    message_index: usize,
+}
+
+struct MessageModelPairRef<'a> {
+    model_index: &'a mut Model,
+    message_index: &'a Message,
 }
 
 impl Simulation {
@@ -210,18 +221,42 @@ impl Simulation {
             .for_each(|model| model.time_advance(time_delta))
     }
 
-    pub fn messages_for_model(&mut self, model: &Model) -> Vec<ModelMessage> {
-        self.messages
-            .iter()
-            .filter_map(|message| match message.target_id() == model.id() {
-                true => Some(
-                    ModelMessage {
-                        port_name: message.target_port().to_string(),
-                        content: message.content().to_string(),
+    /// This is too removed... just shuffling indexes together.
+    /// would rather shuffle together the actual structure references.
+    pub fn messages_for_models(&mut self) -> Vec<MessageModelPair> {
+        let msg_idx = 0..self.messages.len();
+        let mdl_idx = 0..self.models.len();
+        iproduct!(msg_idx, mdl_idx)
+            .filter_map(|(msg_idx, mdl_idx)| {
+                let mdl:& mut Model = & mut self.models[mdl_idx];
+                let msg = &self.messages[msg_idx];
+                println!("{},{}", &mdl.id(), &msg.target_id());
+                match mdl.id() == msg.target_id() {
+                    true => Some(MessageModelPair {
+                        model_index: mdl_idx,
+                        message_index: msg_idx,
                     }),
-                false => None,
+                    false => None,
+                }
             })
-            .collect()
+            .collect::<Vec<_>>()
+    }
+
+    ///For each message and for each models (product)
+    /// find all pairs where model.id == message.target_id.
+    pub fn message_to_model_events_ext(&mut self) -> Result<(), SimulationError> {
+        self.messages_for_models().iter().try_for_each(
+            |mut mmp| -> Result<(), SimulationError> {
+                let model_message = ModelMessage {
+                    port_name: self.messages[mmp.message_index].target_port().to_string(),
+                    content: self.messages[mmp.message_index].content().to_string(),
+                };
+                match self.models[mmp.model_index].events_ext(&model_message, &mut self.services) {
+                    Ok(()) => Ok(()),
+                    Err(e) => Err(e),
+                }
+            },
+        )
     }
 
     /// The simulation step is foundational for a discrete event simulation.
@@ -233,23 +268,29 @@ impl Simulation {
         let messages = self.messages.clone();
         let mut next_messages: Vec<Message> = Vec::new();
         // Process external events
-        if !messages.is_empty() {
-            // want a zip between model and messages.
-            // Want a model here rather than index to model.
-            (0..self.models.len()).try_for_each(|model_index| -> Result<(), SimulationError> {
-                // Collect up all the messages that target the model identified by model_index.
-
-                // I don't like this because of the clone can't do that
-                let mm = self.models()[model_index].clone();
-                let model_messages: Vec<ModelMessage> = self.messages_for_model(&mm);
-
-                model_messages
-                    .iter()
-                    .try_for_each(|model_message| -> Result<(), SimulationError> {
-                        self.models[model_index].events_ext(model_message, &mut self.services)
-                    })
-            })?;
-        }
+        // if !messages.is_empty() {
+        //     (0..self.models.len()).try_for_each(|model_index| -> Result<(), SimulationError> {
+        //         let model_messages: Vec<ModelMessage> = messages
+        //             .iter()
+        //             .filter_map(|message| {
+        //                 if message.target_id() == self.models[model_index].id() {
+        //                     Some(ModelMessage {
+        //                         port_name: message.target_port().to_string(),
+        //                         content: message.content().to_string(),
+        //                     })
+        //                 } else {
+        //                     None
+        //                 }
+        //             })
+        //             .collect();
+        //         model_messages
+        //             .iter()
+        //             .try_for_each(|model_message| -> Result<(), SimulationError> {
+        //                 self.models[model_index].events_ext(model_message, &mut self.services)
+        //             })
+        //     })?;
+        // }
+        self.message_to_model_events_ext();
 
         // Process internal events and gather associated messages
         let until_next_event: f64 = match self.messages.is_empty() {
