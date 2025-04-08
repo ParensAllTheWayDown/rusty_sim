@@ -143,9 +143,15 @@ impl Simulation {
         self.services.set_global_time(0.0);
     }
 
+
+    /// Provide immutable reference to models for analysis.  Can't change.  Just look.
+    pub fn models(&self) -> &[Model] {
+        &self.models
+    }
+
     /// This method provides a convenient foundation for operating on the
     /// full set of models in the simulation.
-    pub fn models(&mut self) -> Vec<&mut Model> {
+    pub fn models_mut(&mut self) -> Vec<&mut Model> {
         self.models.iter_mut().collect()
     }
 
@@ -205,7 +211,7 @@ impl Simulation {
 
     /// advance the time for all models in the simulation
     pub fn time_advance(&mut self, time_delta: f64) {
-        self.models()
+        self.models_mut()
             .iter_mut()
             .for_each(|model| model.time_advance(time_delta))
     }
@@ -240,7 +246,7 @@ impl Simulation {
                 // Collect up all the messages that target the model identified by model_index.
 
                 // I don't like this because of the clone can't do that
-                let mm = self.models()[model_index].clone();
+                let mm = self.models_mut()[model_index].clone();
                 let model_messages: Vec<ModelMessage> = self.messages_for_model(&mm);
 
                 model_messages
