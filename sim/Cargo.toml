@@ -33,6 +33,7 @@ sim_derive = { version = "0.13", path = "../sim_derive" }
 simx = { version = "0.13", path = "../simx", optional = true }
 thiserror = "1.0"
 wasm-bindgen = "0.2"
+itertools = {version = "0.14.0"}
 web-sys = { version = "0.3", features = [ "console" ] }
 
 # The `console_error_panic_hook` crate provides better debugging of panics by

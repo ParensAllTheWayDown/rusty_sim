@@ -149,6 +149,10 @@ impl Simulation {
         &self.models
     }
 
+    pub fn connectors(&self) -> &[Connector] {
+        &self.connectors
+    }
+
     /// This method provides a convenient foundation for operating on the
     /// full set of models in the simulation.
     pub fn models_mut(&mut self) -> Vec<&mut Model> {
