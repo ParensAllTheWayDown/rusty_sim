@@ -1,5 +1,5 @@
-use crate::models::{DevsModel, Model, ModelMessage};
-use crate::simulator::{Services, Simulation};
+use crate::models::{Model};
+use crate::simulator::{Simulation};
 use std::collections::HashMap;
 use itertools::Itertools;
 
