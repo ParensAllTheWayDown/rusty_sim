@@ -220,21 +220,9 @@ impl Simulation {
             .for_each(|model| model.time_advance(time_delta))
     }
 
-    pub fn messages_for_model(&mut self, model: &Model) -> Vec<ModelMessage> {
-        self.messages
-            .iter()
-            .filter_map(|message| match message.target_id() == model.id() {
-                true => Some(
-                    ModelMessage {
-                        port_name: message.target_port().to_string(),
-                        content: message.content().to_string(),
-                    }),
-                false => None,
-            })
-            .collect()
-    }
-
     pub fn run_message_on_model(&mut self, msg: &Message) -> Result<(), SimulationError> {
+        // I'm hoping that a copy of these services preserves the clock and random generator state.
+        // I think it does.  As they are reference counted.
         let mut services = self.services.clone();
         self.models.iter_mut().try_for_each(|m| {
             match m.id() == msg.target_id() {
@@ -246,10 +234,6 @@ impl Simulation {
             }})
     }
 
-    // pub fn handle_messages(&mut self, msgs: Vec<Message>, services: &mut Services) -> Result<(), SimulationError> {
-    //     msgs.iter()
-    //         .try_for_each(|msg| self.run_message_on_model(msg, services))
-    // }
     pub fn handle_messages(&mut self) -> Result<(), SimulationError> {
         self.messages.clone().iter()
             .try_for_each(|msg| self.run_message_on_model(msg))
