@@ -220,23 +220,19 @@ impl Simulation {
             .for_each(|model| model.time_advance(time_delta))
     }
 
-    pub fn run_message_on_model(&mut self, msg: &Message) -> Result<(), SimulationError> {
-        // I'm hoping that a copy of these services preserves the clock and random generator state.
-        // I think it does.  As they are reference counted.
-        let mut services = self.services.clone();
-        self.models.iter_mut().try_for_each(|m| {
-            match m.id() == msg.target_id() {
-                true =>m.events_ext(&ModelMessage {
-                    port_name: msg.target_port().to_string(),
-                    content: msg.content().to_string(),
-                }, &mut services),
-                false => Ok(())
-            }})
-    }
-
     pub fn handle_messages(&mut self) -> Result<(), SimulationError> {
         self.messages.clone().iter()
-            .try_for_each(|msg| self.run_message_on_model(msg))
+            .try_for_each(|msg| {
+                let mut services = self.services.clone();
+                self.models.iter_mut().try_for_each(|m| {
+                    match m.id() == msg.target_id() {
+                        true =>m.events_ext(&ModelMessage {
+                            port_name: msg.target_port().to_string(),
+                            content: msg.content().to_string(),
+                        }, &mut services),
+                        false => Ok(())
+                    }})
+            })
     }
 
 
@@ -249,25 +245,7 @@ impl Simulation {
         let mut next_messages: Vec<Message> = Vec::new();
         // Process external events
         &self.handle_messages()?;
-        // want a zip between model and messages.
-        // Want a model here rather than index to model.
-        // (0..self.models.len()).try_for_each(|model_index| -> Result<(), SimulationError> {
-        //     // Collect up all the messages that target the model identified by model_index.
-        //
-        //     // I don't like this because of the clone can't do that
-        //     let mm = self.models_mut()[model_index].clone();
-        //     let model_messages: Vec<ModelMessage> = self.messages_for_model(&mm);
-        //
-        //     model_messages
-        //         .iter()
-        //         .try_for_each(|model_message| -> Result<(), SimulationError> {
-        //             self.models[model_index].events_ext(model_message, &mut self.services)
-        //         })
-        // })?;
-    // }
-
-
-    // Process internal events and gather associated messages
+        // Process internal events and gather associated messages
         let until_next_event: f64 = match self.messages.is_empty() {
             true => self.until_next_event(),
             _ => 0.0f64,
