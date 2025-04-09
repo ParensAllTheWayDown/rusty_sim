@@ -143,7 +143,6 @@ impl Simulation {
         self.services.set_global_time(0.0);
     }
 
-
     /// Provide immutable reference to models for analysis.  Can't change.  Just look.
     pub fn models(&self) -> &[Model] {
         &self.models
@@ -159,31 +158,20 @@ impl Simulation {
         self.models.iter_mut().collect()
     }
 
-    /// This method constructs a list of target IDs for a given source model
-    /// ID and port.  This message target information is derived from the
-    /// connectors configuration.
-    fn get_message_target_ids(&self, source_id: &str, source_port: &str) -> Vec<String> {
-        self.connectors
-            .iter()
-            .filter_map(|connector| {
-                if connector.source_id() == source_id && connector.source_port() == source_port {
-                    Some(connector.target_id().to_string())
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
 
-    /// This method constructs a list of target ports for a given source model
-    /// ID and port.  This message target information is derived from the
-    /// connectors configuration.
-    fn get_message_target_ports(&self, source_id: &str, source_port: &str) -> Vec<String> {
+    fn get_message_target_tuple(
+        &self,
+        source_id: &str,
+        source_port: &str,
+    ) -> Vec<(String, String)> {
         self.connectors
             .iter()
             .filter_map(|connector| {
                 if connector.source_id() == source_id && connector.source_port() == source_port {
-                    Some(connector.target_port().to_string())
+                    Some((
+                        connector.target_id().to_string(),
+                        connector.target_port().to_string(),
+                    ))
                 } else {
                     None
                 }
@@ -220,21 +208,23 @@ impl Simulation {
             .for_each(|model| model.time_advance(time_delta))
     }
 
-    pub fn handle_messages(&mut self) -> Result<(), SimulationError> {
-        self.messages.clone().iter()
-            .try_for_each(|msg| {
-                let mut services = self.services.clone();
-                self.models.iter_mut().try_for_each(|m| {
-                    match m.id() == msg.target_id() {
-                        true =>m.events_ext(&ModelMessage {
+    pub fn handle_messages(&mut self, messages: Vec<Message>) -> Result<(), SimulationError> {
+        messages.iter().try_for_each(|msg| {
+            let mut services = self.services.clone();
+            self.models
+                .iter_mut()
+                .try_for_each(|m| match m.id() == msg.target_id() {
+                    true => m.events_ext(
+                        &ModelMessage {
                             port_name: msg.target_port().to_string(),
                             content: msg.content().to_string(),
-                        }, &mut services),
-                        false => Ok(())
-                    }})
-            })
+                        },
+                        &mut services,
+                    ),
+                    false => Ok(()),
+                })
+        })
     }
-
 
     /// The simulation step is foundational for a discrete event simulation.
     /// This method executes a single discrete event simulation step,
@@ -244,7 +234,8 @@ impl Simulation {
     pub fn step(&mut self) -> Result<Vec<Message>, SimulationError> {
         let mut next_messages: Vec<Message> = Vec::new();
         // Process external events
-        &self.handle_messages()?;
+        &self.handle_messages(self.messages.clone())?;
+
         // Process internal events and gather associated messages
         let until_next_event: f64 = match self.messages.is_empty() {
             true => self.until_next_event(),
@@ -257,31 +248,26 @@ impl Simulation {
 
         let errors: Result<Vec<()>, SimulationError> = (0..self.models.len())
             .map(|model_index| -> Result<(), SimulationError> {
+                // models filtered to those with eminent next event time.
                 if self.models[model_index].until_next_event() == 0.0 {
                     self.models[model_index]
                         .events_int(&mut self.services)?
                         .iter()
                         .for_each(|outgoing_message| {
-                            let target_ids = self.get_message_target_ids(
+                            let target_tuple = self.get_message_target_tuple(
                                 self.models[model_index].id(), // Outgoing message source model ID
                                 &outgoing_message.port_name,   // Outgoing message source model port
                             );
-                            let target_ports = self.get_message_target_ports(
-                                self.models[model_index].id(), // Outgoing message source model ID
-                                &outgoing_message.port_name,   // Outgoing message source model port
-                            );
-                            target_ids.iter().zip(target_ports.iter()).for_each(
-                                |(target_id, target_port)| {
-                                    next_messages.push(Message::new(
-                                        self.models[model_index].id().to_string(),
-                                        outgoing_message.port_name.clone(),
-                                        target_id.clone(),
-                                        target_port.clone(),
-                                        self.services.global_time(),
-                                        outgoing_message.content.clone(),
-                                    ));
-                                },
-                            );
+                            target_tuple.iter().for_each(|(target_id, target_port)| {
+                                next_messages.push(Message::new(
+                                    self.models[model_index].id().to_string(),
+                                    outgoing_message.port_name.clone(),
+                                    target_id.clone(),
+                                    target_port.clone(),
+                                    self.services.global_time(),
+                                    outgoing_message.content.clone(),
+                                ));
+                            });
                         });
                 }
                 Ok(())
