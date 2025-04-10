@@ -144,11 +144,11 @@ impl Simulation {
     }
 
     /// Provide immutable reference to models for analysis.  Can't change.  Just look.
-    pub fn models(&self) -> &[Model] {
+    pub fn get_models(&self) -> &[Model] {
         &self.models
     }
 
-    pub fn connectors(&self) -> &[Connector] {
+    pub fn get_connectors(&self) -> &[Connector] {
         &self.connectors
     }
 
@@ -157,7 +157,6 @@ impl Simulation {
     pub fn models_mut(&mut self) -> Vec<&mut Model> {
         self.models.iter_mut().collect()
     }
-
 
     fn get_message_target_tuple(
         &self,
@@ -308,4 +307,10 @@ impl Simulation {
             .find(Result::is_err)
             .unwrap_or(Ok(message_records))
     }
+
+    //TODO Only collect messages meeting some predicate
+    // all the step methods collect all messages this may be a lot of messages
+    // if a simulation runs to steady state.
+    // It might be good to have a step method that filters the messages that are kept so the caller
+    // can determine if they want to keep all or just messages meeting some predicate conditions.
 }
