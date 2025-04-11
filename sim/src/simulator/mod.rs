@@ -14,7 +14,6 @@
 //! return the messages generated during the execution of the simulation
 //! step(s), for use in message analysis.
 
-use itertools::iproduct;
 use serde::{Deserialize, Serialize};
 
 use crate::input_modeling::dyn_rng;
@@ -42,16 +41,6 @@ pub struct Simulation {
     connectors: Vec<Connector>,
     messages: Vec<Message>,
     services: Services,
-}
-
-struct MessageModelPair {
-    model_index: usize,
-    message_index: usize,
-}
-
-struct MessageModelPairRef<'a> {
-    model_index: &'a mut Model,
-    message_index: &'a Message,
 }
 
 impl Simulation {
@@ -154,37 +143,34 @@ impl Simulation {
         self.services.set_global_time(0.0);
     }
 
+    /// Provide immutable reference to models for analysis.  Can't change.  Just look.
+    pub fn get_models(&self) -> &[Model] {
+        &self.models
+    }
+
+    pub fn get_connectors(&self) -> &[Connector] {
+        &self.connectors
+    }
+
     /// This method provides a convenient foundation for operating on the
     /// full set of models in the simulation.
-    pub fn models(&mut self) -> Vec<&mut Model> {
+    pub fn models_mut(&mut self) -> Vec<&mut Model> {
         self.models.iter_mut().collect()
     }
 
-    /// This method constructs a list of target IDs for a given source model
-    /// ID and port.  This message target information is derived from the
-    /// connectors configuration.
-    fn get_message_target_ids(&self, source_id: &str, source_port: &str) -> Vec<String> {
+    fn get_message_target_tuple(
+        &self,
+        source_id: &str,
+        source_port: &str,
+    ) -> Vec<(String, String)> {
         self.connectors
             .iter()
             .filter_map(|connector| {
                 if connector.source_id() == source_id && connector.source_port() == source_port {
-                    Some(connector.target_id().to_string())
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
-
-    /// This method constructs a list of target ports for a given source model
-    /// ID and port.  This message target information is derived from the
-    /// connectors configuration.
-    fn get_message_target_ports(&self, source_id: &str, source_port: &str) -> Vec<String> {
-        self.connectors
-            .iter()
-            .filter_map(|connector| {
-                if connector.source_id() == source_id && connector.source_port() == source_port {
-                    Some(connector.target_port().to_string())
+                    Some((
+                        connector.target_id().to_string(),
+                        connector.target_port().to_string(),
+                    ))
                 } else {
                     None
                 }
@@ -216,47 +202,27 @@ impl Simulation {
 
     /// advance the time for all models in the simulation
     pub fn time_advance(&mut self, time_delta: f64) {
-        self.models()
+        self.models_mut()
             .iter_mut()
             .for_each(|model| model.time_advance(time_delta))
     }
 
-    /// This is too removed... just shuffling indexes together.
-    /// would rather shuffle together the actual structure references.
-    pub fn messages_for_models(&mut self) -> Vec<MessageModelPair> {
-        let msg_idx = 0..self.messages.len();
-        let mdl_idx = 0..self.models.len();
-        iproduct!(msg_idx, mdl_idx)
-            .filter_map(|(msg_idx, mdl_idx)| {
-                let mdl:& mut Model = & mut self.models[mdl_idx];
-                let msg = &self.messages[msg_idx];
-                println!("{},{}", &mdl.id(), &msg.target_id());
-                match mdl.id() == msg.target_id() {
-                    true => Some(MessageModelPair {
-                        model_index: mdl_idx,
-                        message_index: msg_idx,
-                    }),
-                    false => None,
-                }
-            })
-            .collect::<Vec<_>>()
-    }
-
-    ///For each message and for each models (product)
-    /// find all pairs where model.id == message.target_id.
-    pub fn message_to_model_events_ext(&mut self) -> Result<(), SimulationError> {
-        self.messages_for_models().iter().try_for_each(
-            |mut mmp| -> Result<(), SimulationError> {
-                let model_message = ModelMessage {
-                    port_name: self.messages[mmp.message_index].target_port().to_string(),
-                    content: self.messages[mmp.message_index].content().to_string(),
-                };
-                match self.models[mmp.model_index].events_ext(&model_message, &mut self.services) {
-                    Ok(()) => Ok(()),
-                    Err(e) => Err(e),
-                }
-            },
-        )
+    pub fn handle_messages(&mut self, messages: Vec<Message>) -> Result<(), SimulationError> {
+        messages.iter().try_for_each(|msg| {
+            let mut services = self.services.clone();
+            self.models
+                .iter_mut()
+                .try_for_each(|m| match m.id() == msg.target_id() {
+                    true => m.events_ext(
+                        &ModelMessage {
+                            port_name: msg.target_port().to_string(),
+                            content: msg.content().to_string(),
+                        },
+                        &mut services,
+                    ),
+                    false => Ok(()),
+                })
+        })
     }
 
     /// The simulation step is foundational for a discrete event simulation.
@@ -265,32 +231,9 @@ impl Simulation {
     /// message orchestration, global time accounting, and step messages
     /// output.
     pub fn step(&mut self) -> Result<Vec<Message>, SimulationError> {
-        let messages = self.messages.clone();
         let mut next_messages: Vec<Message> = Vec::new();
         // Process external events
-        // if !messages.is_empty() {
-        //     (0..self.models.len()).try_for_each(|model_index| -> Result<(), SimulationError> {
-        //         let model_messages: Vec<ModelMessage> = messages
-        //             .iter()
-        //             .filter_map(|message| {
-        //                 if message.target_id() == self.models[model_index].id() {
-        //                     Some(ModelMessage {
-        //                         port_name: message.target_port().to_string(),
-        //                         content: message.content().to_string(),
-        //                     })
-        //                 } else {
-        //                     None
-        //                 }
-        //             })
-        //             .collect();
-        //         model_messages
-        //             .iter()
-        //             .try_for_each(|model_message| -> Result<(), SimulationError> {
-        //                 self.models[model_index].events_ext(model_message, &mut self.services)
-        //             })
-        //     })?;
-        // }
-        self.message_to_model_events_ext();
+        &self.handle_messages(self.messages.clone())?;
 
         // Process internal events and gather associated messages
         let until_next_event: f64 = match self.messages.is_empty() {
@@ -304,31 +247,26 @@ impl Simulation {
 
         let errors: Result<Vec<()>, SimulationError> = (0..self.models.len())
             .map(|model_index| -> Result<(), SimulationError> {
+                // models filtered to those with eminent next event time.
                 if self.models[model_index].until_next_event() == 0.0 {
                     self.models[model_index]
                         .events_int(&mut self.services)?
                         .iter()
                         .for_each(|outgoing_message| {
-                            let target_ids = self.get_message_target_ids(
+                            let target_tuple = self.get_message_target_tuple(
                                 self.models[model_index].id(), // Outgoing message source model ID
                                 &outgoing_message.port_name,   // Outgoing message source model port
                             );
-                            let target_ports = self.get_message_target_ports(
-                                self.models[model_index].id(), // Outgoing message source model ID
-                                &outgoing_message.port_name,   // Outgoing message source model port
-                            );
-                            target_ids.iter().zip(target_ports.iter()).for_each(
-                                |(target_id, target_port)| {
-                                    next_messages.push(Message::new(
-                                        self.models[model_index].id().to_string(),
-                                        outgoing_message.port_name.clone(),
-                                        target_id.clone(),
-                                        target_port.clone(),
-                                        self.services.global_time(),
-                                        outgoing_message.content.clone(),
-                                    ));
-                                },
-                            );
+                            target_tuple.iter().for_each(|(target_id, target_port)| {
+                                next_messages.push(Message::new(
+                                    self.models[model_index].id().to_string(),
+                                    outgoing_message.port_name.clone(),
+                                    target_id.clone(),
+                                    target_port.clone(),
+                                    self.services.global_time(),
+                                    outgoing_message.content.clone(),
+                                ));
+                            });
                         });
                 }
                 Ok(())
@@ -369,4 +307,10 @@ impl Simulation {
             .find(Result::is_err)
             .unwrap_or(Ok(message_records))
     }
+
+    //TODO Only collect messages meeting some predicate
+    // all the step methods collect all messages this may be a lot of messages
+    // if a simulation runs to steady state.
+    // It might be good to have a step method that filters the messages that are kept so the caller
+    // can determine if they want to keep all or just messages meeting some predicate conditions.
 }
