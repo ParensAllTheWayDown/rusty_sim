@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use super::model_trait::{DevsModel, Reportable, ReportableModel, SerializableModel};
 use super::{ModelMessage, ModelRecord};
 use crate::simulator::Services;
-use crate::utils::errors::SimulationError;
+use crate::utils::errors::{SimulationError, SimulationResult};
 
 use sim_derive::SerializableModel;
 
@@ -165,7 +165,7 @@ impl DevsModel for ParallelGateway {
         &mut self,
         incoming_message: &ModelMessage,
         services: &mut Services,
-    ) -> Result<(), SimulationError> {
+    ) -> SimulationResult<()> {
         match self.arrival_port(&incoming_message.port_name) {
             ArrivalPort::FlowPath => Ok(self.increment_collection(incoming_message, services)),
             ArrivalPort::Unknown => Err(SimulationError::InvalidMessage),

@@ -10,7 +10,7 @@ use num_traits::{Float, NumAssign};
 use serde::{Deserialize, Serialize};
 
 pub mod t_scores;
-use crate::utils::errors::SimulationError;
+use crate::utils::errors::{SimulationError, SimulationResult};
 use crate::utils::usize_sqrt;
 
 fn sum<T: Float>(points: &[T]) -> T
@@ -223,7 +223,7 @@ where
     /// autocorrelation, respectively.  After this method determines the
     /// strategy/configuration, the `calculate_batch_statistics` then
     /// executes the processing.
-    fn set_to_fixed_budget(&mut self) -> Result<(), SimulationError> {
+    fn set_to_fixed_budget(&mut self) -> SimulationResult<()> {
         let mut s = 0.0.into();
         let mut q = 0.0.into();
         let mut d = self.time_series.len() - 2;
@@ -267,7 +267,7 @@ where
     /// and processing.  This method stores the batch statistics in the
     /// `SteadyStateOutput` struct, for later use in retrieving point and
     /// confidence interval estimates.
-    fn calculate_batch_statistics(&mut self) -> Result<(), SimulationError> {
+    fn calculate_batch_statistics(&mut self) -> SimulationResult<()> {
         if self.batch_count.is_none() {
             self.set_to_fixed_budget()?;
         }

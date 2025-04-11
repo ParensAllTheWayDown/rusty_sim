@@ -6,7 +6,7 @@ use sim::models::{
 };
 use sim::output_analysis::{IndependentSample, SteadyStateOutput};
 use sim::simulator::{Connector, Message, Simulation};
-use sim::utils::errors::SimulationError;
+use sim::utils::errors::{SimulationError, SimulationResult};
 
 fn epsilon() -> f64 {
     0.34
@@ -17,7 +17,7 @@ fn get_message_number(message: &str) -> Option<&str> {
 }
 
 #[test]
-fn poisson_generator_processor_with_capacity() -> Result<(), SimulationError> {
+fn poisson_generator_processor_with_capacity() -> SimulationResult<()> {
     let models = [
         Model::new(
             String::from("generator-01"),
@@ -129,7 +129,7 @@ fn poisson_generator_processor_with_capacity() -> Result<(), SimulationError> {
 }
 
 #[test]
-fn step_until_activities() -> Result<(), SimulationError> {
+fn step_until_activities() -> SimulationResult<()> {
     let models = [
         Model::new(
             String::from("generator-01"),
@@ -178,7 +178,7 @@ fn step_until_activities() -> Result<(), SimulationError> {
 }
 
 #[test]
-fn non_stationary_generation() -> Result<(), SimulationError> {
+fn non_stationary_generation() -> SimulationResult<()> {
     let models = [
         Model::new(
             String::from("generator-01"),
@@ -255,7 +255,7 @@ fn non_stationary_generation() -> Result<(), SimulationError> {
 }
 
 #[test]
-fn exclusive_gateway_proportions_chi_square() -> Result<(), SimulationError> {
+fn exclusive_gateway_proportions_chi_square() -> SimulationResult<()> {
     let models = [
         Model::new(
             String::from("generator-01"),
@@ -379,7 +379,7 @@ fn exclusive_gateway_proportions_chi_square() -> Result<(), SimulationError> {
 }
 
 #[test]
-fn gate_blocking_proportions() -> Result<(), SimulationError> {
+fn gate_blocking_proportions() -> SimulationResult<()> {
     // Deactivation/activation switch at a much higher frequency than job arrival, to limit autocorrelation and initialization bias
     let models = [
         Model::new(
@@ -496,7 +496,7 @@ fn gate_blocking_proportions() -> Result<(), SimulationError> {
 }
 
 #[test]
-fn load_balancer_round_robin_outputs() -> Result<(), SimulationError> {
+fn load_balancer_round_robin_outputs() -> SimulationResult<()> {
     // Deactivation/activation switch at a much higher frequency than job arrival, to limit autocorrelation and initialization bias
     let models = [
         Model::new(
@@ -605,7 +605,7 @@ fn load_balancer_round_robin_outputs() -> Result<(), SimulationError> {
 }
 
 #[test]
-fn injection_initiated_stored_value_exchange() -> Result<(), SimulationError> {
+fn injection_initiated_stored_value_exchange() -> SimulationResult<()> {
     let models = [
         Model::new(
             String::from("storage-01"),
@@ -678,7 +678,7 @@ fn injection_initiated_stored_value_exchange() -> Result<(), SimulationError> {
 }
 
 #[test]
-fn parallel_gateway_splits_and_joins() -> Result<(), SimulationError> {
+fn parallel_gateway_splits_and_joins() -> SimulationResult<()> {
     let models = [
         Model::new(
             String::from("generator-01"),
@@ -787,7 +787,7 @@ fn parallel_gateway_splits_and_joins() -> Result<(), SimulationError> {
 }
 
 #[test]
-fn match_status_reporting() -> Result<(), SimulationError> {
+fn match_status_reporting() -> SimulationResult<()> {
     let models = [
         Model::new(
             String::from("generator-01"),
@@ -823,7 +823,7 @@ fn match_status_reporting() -> Result<(), SimulationError> {
 }
 
 #[test]
-fn stochastic_gate_blocking() -> Result<(), SimulationError> {
+fn stochastic_gate_blocking() -> SimulationResult<()> {
     let models = [
         Model::new(
             String::from("generator-01"),
@@ -893,7 +893,7 @@ fn stochastic_gate_blocking() -> Result<(), SimulationError> {
 }
 
 #[test]
-fn batch_sizing() -> Result<(), SimulationError> {
+fn batch_sizing() -> SimulationResult<()> {
     let models = [
         Model::new(
             String::from("generator-01"),
@@ -964,7 +964,7 @@ fn batch_sizing() -> Result<(), SimulationError> {
 }
 
 #[test]
-fn min_and_max_stopwatch() -> Result<(), SimulationError> {
+fn min_and_max_stopwatch() -> SimulationResult<()> {
     let models = [
         Model::new(
             String::from("generator-01"),

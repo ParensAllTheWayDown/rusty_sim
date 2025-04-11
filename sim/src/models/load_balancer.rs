@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use super::model_trait::{DevsModel, Reportable, ReportableModel, SerializableModel};
 use super::{ModelMessage, ModelRecord};
 use crate::simulator::Services;
-use crate::utils::errors::SimulationError;
+use crate::utils::errors::{SimulationError, SimulationResult};
 
 use sim_derive::SerializableModel;
 
@@ -129,7 +129,7 @@ impl DevsModel for LoadBalancer {
         &mut self,
         incoming_message: &ModelMessage,
         services: &mut Services,
-    ) -> Result<(), SimulationError> {
+    ) -> SimulationResult<()> {
         Ok(self.pass_job(incoming_message, services))
     }
 

@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use super::model_trait::{DevsModel, Reportable, ReportableModel, SerializableModel};
 use super::{ModelMessage, ModelRecord};
 use crate::simulator::Services;
-use crate::utils::errors::SimulationError;
+use crate::utils::errors::{SimulationError, SimulationResult};
 
 use sim_derive::SerializableModel;
 
@@ -195,7 +195,7 @@ impl DevsModel for Batcher {
         &mut self,
         incoming_message: &ModelMessage,
         services: &mut Services,
-    ) -> Result<(), SimulationError> {
+    ) -> SimulationResult<()> {
         match (
             &self.state.phase,
             self.state.jobs.len() + 1 < self.max_batch_size,
@@ -210,7 +210,7 @@ impl DevsModel for Batcher {
     fn events_int(
         &mut self,
         services: &mut Services,
-    ) -> Result<Vec<ModelMessage>, SimulationError> {
+    ) -> SimulationResult<Vec<ModelMessage>> {
         match (
             self.state.jobs.len() <= self.max_batch_size,
             self.state.jobs.len() >= 2 * self.max_batch_size,

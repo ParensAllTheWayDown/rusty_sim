@@ -7,7 +7,7 @@ use super::{ModelMessage, ModelRecord};
 use crate::input_modeling::dynamic_rng::DynRng;
 use crate::input_modeling::IndexRandomVariable;
 use crate::simulator::Services;
-use crate::utils::errors::SimulationError;
+use crate::utils::errors::{SimulationError, SimulationResult};
 
 use sim_derive::SerializableModel;
 
@@ -158,7 +158,7 @@ impl DevsModel for ExclusiveGateway {
         &mut self,
         incoming_message: &ModelMessage,
         services: &mut Services,
-    ) -> Result<(), SimulationError> {
+    ) -> SimulationResult<()> {
         Ok(self.pass_job(incoming_message, services))
     }
 

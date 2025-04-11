@@ -176,7 +176,7 @@ fn message_to_model_message() {
 //                 })),
 //                 false => None,
 //             }
-//         }).try_for_each(|mdl, mm| -> Result<(), SimulationError> {
+//         }).try_for_each(|mdl, mm| -> SimulationResult<()> {
 //         mdl.events_ext(mm, &mut self.services)
 //     })
 //         

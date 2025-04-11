@@ -7,7 +7,7 @@ use super::{ModelMessage, ModelRecord};
 use crate::input_modeling::dynamic_rng::DynRng;
 use crate::input_modeling::BooleanRandomVariable;
 use crate::simulator::Services;
-use crate::utils::errors::SimulationError;
+use crate::utils::errors::{SimulationError, SimulationResult};
 
 use sim_derive::SerializableModel;
 
@@ -104,7 +104,7 @@ impl StochasticGate {
         &mut self,
         incoming_message: &ModelMessage,
         services: &mut Services,
-    ) -> Result<(), SimulationError> {
+    ) -> SimulationResult<()> {
         self.state.until_next_event = 0.0;
         self.state.jobs.push(Job {
             content: incoming_message.content.clone(),
@@ -166,7 +166,7 @@ impl DevsModel for StochasticGate {
         &mut self,
         incoming_message: &ModelMessage,
         services: &mut Services,
-    ) -> Result<(), SimulationError> {
+    ) -> SimulationResult<()> {
         match self.arrival_port(&incoming_message.port_name) {
             ArrivalPort::Job => self.receive_job(incoming_message, services),
             ArrivalPort::Unknown => Err(SimulationError::InvalidMessage),

@@ -6,7 +6,7 @@ use super::model_trait::{DevsModel, Reportable, ReportableModel, SerializableMod
 use super::{Model, ModelMessage, ModelRecord};
 
 use crate::simulator::Services;
-use crate::utils::errors::SimulationError;
+use crate::utils::errors::{SimulationError, SimulationResult};
 
 use sim_derive::SerializableModel;
 
@@ -171,7 +171,7 @@ impl Coupled {
         &mut self,
         parked_messages: &[ParkedMessage],
         services: &mut Services,
-    ) -> Result<(), SimulationError> {
+    ) -> SimulationResult<()> {
         parked_messages.iter().try_for_each(|parked_message| {
             self.components
                 .iter_mut()
@@ -216,7 +216,7 @@ impl Coupled {
         ext_transitioning_component_triggers
             .iter()
             .map(
-                |(component_index, message_port, message_content)| -> Result<(), SimulationError> {
+                |(component_index, message_port, message_content)| -> SimulationResult<()> {
                     self.components[*component_index].events_ext(
                         &ModelMessage {
                             port_name: message_port.to_string(),
@@ -283,7 +283,7 @@ impl DevsModel for Coupled {
         &mut self,
         incoming_message: &ModelMessage,
         services: &mut Services,
-    ) -> Result<(), SimulationError> {
+    ) -> SimulationResult<()> {
         match self.park_incoming_messages(incoming_message) {
             None => Ok(()),
             Some(parked_messages) => self.distribute_events_ext(&parked_messages, services),

@@ -4,7 +4,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use super::model_trait::{DevsModel, Reportable, ReportableModel, SerializableModel};
 use super::{ModelMessage, ModelRecord};
 use crate::simulator::Services;
-use crate::utils::errors::SimulationError;
+use crate::utils::errors::{SimulationError, SimulationResult};
 
 /// `Model` wraps `model_type` and provides common ID functionality (a struct
 /// field and associated accessor method).  The simulator requires all models
@@ -56,14 +56,14 @@ impl DevsModel for Model {
         &mut self,
         incoming_message: &ModelMessage,
         services: &mut Services,
-    ) -> Result<(), SimulationError> {
+    ) -> SimulationResult<()> {
         self.inner.events_ext(incoming_message, services)
     }
 
     fn events_int(
         &mut self,
         services: &mut Services,
-    ) -> Result<Vec<ModelMessage>, SimulationError> {
+    ) -> SimulationResult<Vec<ModelMessage>> {
         self.inner.events_int(services)
     }
 

@@ -7,7 +7,7 @@ use super::{ModelMessage, ModelRecord};
 use crate::input_modeling::dynamic_rng::DynRng;
 use crate::input_modeling::ContinuousRandomVariable;
 use crate::simulator::Services;
-use crate::utils::errors::SimulationError;
+use crate::utils::errors::{SimulationError, SimulationResult};
 
 use sim_derive::SerializableModel;
 
@@ -131,7 +131,7 @@ impl Processor {
         &mut self,
         incoming_message: &ModelMessage,
         services: &mut Services,
-    ) -> Result<(), SimulationError> {
+    ) -> SimulationResult<()> {
         self.state.queue.push(incoming_message.content.clone());
         self.state.phase = Phase::Active;
         self.state.until_next_event = match &self.rng {
@@ -214,7 +214,7 @@ impl DevsModel for Processor {
         &mut self,
         incoming_message: &ModelMessage,
         services: &mut Services,
-    ) -> Result<(), SimulationError> {
+    ) -> SimulationResult<()> {
         match (
             self.arrival_port(&incoming_message.port_name),
             self.state.queue.is_empty(),

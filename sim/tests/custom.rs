@@ -5,7 +5,7 @@ use sim::input_modeling::ContinuousRandomVariable;
 use sim::models::model_trait::{DevsModel, Reportable, ReportableModel, SerializableModel};
 use sim::models::{Generator, Model, ModelMessage, ModelRecord};
 use sim::simulator::{Connector, Message, Services, Simulation, WebSimulation};
-use sim::utils::errors::SimulationError;
+use sim::utils::errors::{SimulationError, SimulationResult};
 use sim_derive::{register, SerializableModel};
 use wasm_bindgen_test::{wasm_bindgen_test, wasm_bindgen_test_configure};
 
@@ -51,7 +51,7 @@ impl DevsModel for Passive {
         &mut self,
         _incoming_message: &ModelMessage,
         _services: &mut Services,
-    ) -> Result<(), SimulationError> {
+    ) -> SimulationResult<()> {
         Ok(())
     }
 
@@ -86,7 +86,7 @@ impl Reportable for Passive {
 impl ReportableModel for Passive {}
 
 #[test]
-fn step_n_with_custom_passive_model() -> Result<(), SimulationError> {
+fn step_n_with_custom_passive_model() -> SimulationResult<()> {
     let models = [
         Model::new(
             String::from("generator-01"),

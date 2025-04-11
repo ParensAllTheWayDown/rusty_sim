@@ -1,6 +1,6 @@
 use super::{ModelMessage, ModelRecord};
 use crate::simulator::Services;
-use crate::utils::errors::SimulationError;
+use crate::utils::errors::{SimulationError, SimulationResult};
 
 pub trait ModelClone {
     fn clone_box(&self) -> Box<dyn ReportableModel>;
@@ -39,7 +39,7 @@ pub trait DevsModel: ModelClone + SerializableModel {
         &mut self,
         incoming_message: &ModelMessage,
         services: &mut Services,
-    ) -> Result<(), SimulationError>;
+    ) -> SimulationResult<()>;
     fn events_int(&mut self, services: &mut Services)
         -> Result<Vec<ModelMessage>, SimulationError>;
     fn time_advance(&mut self, time_delta: f64);

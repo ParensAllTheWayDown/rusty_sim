@@ -4,14 +4,13 @@ use sim::models::{
 };
 use sim::output_analysis::{ConfidenceInterval, SteadyStateOutput};
 use sim::simulator::{Connector, Message, Simulation};
-use sim::utils::errors::SimulationError;
-
+use sim::utils::errors::{SimulationError, SimulationResult};
 fn get_message_number(message: &str) -> Option<&str> {
     message.split_whitespace().last()
 }
 
 #[test]
-fn closure_under_coupling() -> Result<(), SimulationError> {
+fn closure_under_coupling() -> SimulationResult<()> {
     let atomic_models = vec![
         Model::new(
             String::from("generator-01"),

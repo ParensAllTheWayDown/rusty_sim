@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use crate::input_modeling::dyn_rng;
 use crate::input_modeling::dynamic_rng::SimulationRng;
 use crate::models::{DevsModel, Model, ModelMessage, ModelRecord, Reportable};
-use crate::utils::errors::SimulationError;
+use crate::utils::errors::{ SimulationError, SimulationResult };
 use crate::utils::set_panic_hook;
 
 pub mod coupling;
@@ -207,7 +207,7 @@ impl Simulation {
             .for_each(|model| model.time_advance(time_delta))
     }
 
-    pub fn handle_messages(&mut self, messages: Vec<Message>) -> Result<(), SimulationError> {
+    pub fn handle_messages(&mut self, messages: Vec<Message>) -> SimulationResult<()> {
         messages.iter().try_for_each(|msg| {
             let mut services = self.services.clone();
             self.models
@@ -230,7 +230,7 @@ impl Simulation {
     /// including internal state transitions, external state transitions,
     /// message orchestration, global time accounting, and step messages
     /// output.
-    pub fn step(&mut self) -> Result<Vec<Message>, SimulationError> {
+    pub fn step(&mut self) -> SimulationResult<Vec<Message>> {
         let mut next_messages: Vec<Message> = Vec::new();
         // Process external events
         &self.handle_messages(self.messages.clone())?;
@@ -246,7 +246,7 @@ impl Simulation {
             .set_global_time(self.services.global_time() + until_next_event);
 
         let errors: Result<Vec<()>, SimulationError> = (0..self.models.len())
-            .map(|model_index| -> Result<(), SimulationError> {
+            .map(|model_index| -> SimulationResult<()>{
                 // models filtered to those with eminent next event time.
                 if self.models[model_index].until_next_event() == 0.0 {
                     self.models[model_index]

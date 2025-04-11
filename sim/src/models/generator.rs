@@ -6,7 +6,7 @@ use crate::input_modeling::dynamic_rng::DynRng;
 use crate::input_modeling::ContinuousRandomVariable;
 use crate::input_modeling::Thinning;
 use crate::simulator::Services;
-use crate::utils::errors::SimulationError;
+use crate::utils::errors::{SimulationError, SimulationResult};
 
 use sim_derive::SerializableModel;
 
@@ -162,7 +162,7 @@ impl DevsModel for Generator {
         &mut self,
         _incoming_message: &ModelMessage,
         _services: &mut Services,
-    ) -> Result<(), SimulationError> {
+    ) -> SimulationResult<()> {
         Ok(())
     }
 
