@@ -1,3 +1,4 @@
+use std::hash::{Hash, Hasher};
 use serde::ser::SerializeMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -51,6 +52,22 @@ impl<'de> Deserialize<'de> for Model {
 
 impl SerializableModel for Model {}
 
+// Implement equal and hash for Model so that a model can be used as a key in a HashMap.
+// It is very important that a model.id is unique in the system.
+impl PartialEq for Model {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+impl Eq for Model {}
+
+impl Hash for Model {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+    }
+}
+
 impl DevsModel for Model {
     fn events_ext(
         &mut self,
@@ -97,3 +114,4 @@ impl Reportable for Model {
 }
 
 impl ReportableModel for Model {}
+
