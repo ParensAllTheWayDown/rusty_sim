@@ -3,10 +3,10 @@
 use itertools::iproduct;
 use sim::input_modeling::ContinuousRandomVariable;
 use sim::models::{Generator, Model, ModelMessage, Storage};
-use sim::simulator::{Connector, Message, Simulation};
+use sim::simulator::{Connector, Message, ModelCollectionType, Simulation};
 use sim::utils::errors::SimulationError;
 
-fn base_models() -> Vec<Model> {
+fn base_models() -> ModelCollectionType {
     vec![
         Model::new(
             String::from("generator-01"),
@@ -27,7 +27,7 @@ fn base_models() -> Vec<Model> {
                 false,
             )),
         ),
-    ]
+    ].iter().map(|m|(m.id().to_string(), m.clone())).collect()
 }
 
 fn base_connectors() -> Vec<Connector> {
@@ -62,7 +62,7 @@ fn base_messages() -> Vec<Message> {
 }
 
 fn base_simulation() -> Simulation {
-    let mut sim = Simulation::post(base_models(), base_connectors());
+    let mut sim = Simulation::post_hd(base_models(), base_connectors());
     // Add on message into the model.
     base_messages().iter().for_each(|msg| {
         sim.inject_input(msg.clone());
@@ -82,11 +82,11 @@ fn model_filter_first() {
     //get a copy of the model to do the messages_for_model
     let related_models = models
         .iter()
-        .filter(|m| m.id() == expected_model_id)
+        .filter(|(model_id, m)| m.id() == expected_model_id)
         .map(|om| om.clone())
         .collect::<Vec<_>>();
     assert_eq!(related_models.len(), 1);
-    assert_eq!(related_models[0].id(), expected_model_id);
+    assert_eq!(*related_models[0].0, expected_model_id);
 }
 
 /// iterate over models and fine any models with the selected id.
@@ -95,13 +95,8 @@ fn model_filter_first() {
 fn model_filter() {
     let expected_model_id = "generator-01".to_string();
     let models = base_models();
-    let related_models: Vec<&Model> = models
-        // .iter_mut()
-        .iter()
-        .filter(|m| m.id() == expected_model_id)
-        .collect::<Vec<_>>();
-    assert_eq!(related_models.len(), 1);
-    assert_eq!(related_models[0].id(), expected_model_id);
+    let related_model = models.get(&expected_model_id);
+    assert!(related_model.is_some());
 }
 
 ///Ah, retain!  Can do this but it mutates the Vec<Models> Which may or may not be ok.
@@ -109,74 +104,6 @@ fn model_filter() {
 fn model_retain() {
     let expected_model_id = "storage-01".to_string();
     let mut models = base_models();
-    models.retain(|m| m.id() == expected_model_id);
-    assert_eq!(models.len(), 1);
-    assert_eq!(models[0].id(), expected_model_id);
-}
-//
-// let model = models.iter().filter_map(|m|{
-//     match m.id() == "generator-01".to_string() {
-//         true => Some(m.clone()),
-//         false => None,
-//     }
-// }).collect().first();
-
-#[test]
-fn message_match_filter_map() {
-    let expected_model_id = "storage-01".to_string();
-
-    let messages = base_messages();
-    let mut models = base_models();
-    //for each model, for each message (recycled) where message is addressed to model by target_id.
-    //Not efficient because a message is checked for each model even if the message has already been selected for a different model.
-    // Honoring the original alg...
-    let zmm = iproduct!(messages, models)
-        .filter(|(msg, mdl)| {
-            println!("{},{}", mdl.id(), msg.target_id());
-            mdl.id() == msg.target_id()
-        })
-        .collect::<Vec<_>>();
-    assert_eq!(zmm.len(), 2);
-}
-#[test]
-fn message_to_model_message() {
-    let expected_model_id = "storage-01".to_string();
-
-    let messages = base_messages();
-    let mut models = base_models();
-    //for each model, for each message (recycled) where message is addressed to model by target_id.
-    //Not efficient because a message is checked for each model even if the message has already been selected for a different model.
-    // Honoring the original alg...
-    let zmm = iproduct!(messages, models)
-        .filter_map(|(msg, mdl)| {
-            println!("{},{}", mdl.id(), msg.target_id());
-            match mdl.id() == msg.target_id() {
-                true => Some(ModelMessage {
-                    port_name: msg.target_port().to_string(),
-                    content: msg.content().to_string(),
-                }),
-                false => None,
-            }
-        })
-        .collect::<Vec<_>>();
-    assert_eq!(zmm.len(), 2);
+    assert!(models.get(&expected_model_id).is_some());
 }
 
-
-// #[test]
-// fn mesage_to_model_events_ext() {
-//     let sim = base_simulation();
-//     iproduct!(sim.messages, sim.models)
-//         .filter_map(|(msg, mdl)| {
-//             println!("{},{}", mdl.id(), msg.target_id());
-//             match mdl.id() == msg.target_id() {
-//                 true => Some((mdl, ModelMessage {
-//                     port_name: msg.target_port().to_string(),
-//                     content: msg.content().to_string(),
-//                 })),
-//                 false => None,
-//             }
-//         }).try_for_each(|mdl, mm| -> SimulationResult<()> {
-//         mdl.events_ext(mm, &mut self.services)
-//     })
-//         
