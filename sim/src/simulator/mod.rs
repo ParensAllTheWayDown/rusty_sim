@@ -331,21 +331,26 @@ impl Simulation {
                                     model_index,                 // Outgoing message source model ID
                                     &outgoing_message.port_name, // Outgoing message source model port
                                 );
-
-                                target_tuple.iter()
-                                    // for each target tuple, create a new Message
-                                    // and push each message onto the 'next_messages' that will become the
-                                    // messages handled in the next step.
-                                    .for_each(|(target_id, target_port)| {
-                                    next_messages.push(Message::new(
-                                        model_index.to_string(),
-                                        outgoing_message.port_name.clone(),
-                                        target_id.clone(),
-                                        target_port.clone(),
-                                        self.services.global_time(),
-                                        outgoing_message.content.clone(),
-                                    ));
-                                });
+                                
+                                // we know that next_messages will be grown by each item in target_tuple
+                                // so use an extend to add them all.
+                                next_messages.extend(
+                                    target_tuple
+                                        .iter()
+                                        // for each target tuple, create a new Message
+                                        // and push each message onto the 'next_messages' that will become the
+                                        // messages handled in the next step.
+                                        .map(|(target_id, target_port)| {
+                                            Message::new(
+                                                model_index.to_string(),
+                                                outgoing_message.port_name.clone(),
+                                                target_id.clone(),
+                                                target_port.clone(),
+                                                self.services.global_time(),
+                                                outgoing_message.content.clone(),
+                                            )
+                                        }),
+                                );
                             });
                     }
                     false => {}
