@@ -299,26 +299,27 @@ impl Simulation {
             .services
             .set_global_time(self.services.global_time() + until_next_event);
 
-        //TODO write this for model HashMap
-        let errors: Result<Vec<()>, SimulationError> = self
+        let model_id_cold = &self
             .models
-            .keys()
-            .collect_vec()
+            .keys().map(|id| id.clone()).collect_vec();
+        //TODO write this for model HashMap
+        let errors: Result<Vec<()>, SimulationError> = model_id_cold
             .iter()
             .map(|model_index| -> SimulationResult<()> {
+                let model_cold = self.models.get(&*model_index).ok_or(SimulationError::ModelNotFound)?;
                 // models filtered to those with eminent next event time.
-                if self.models[model_index].until_next_event() == 0.0 {
-                    self.models[model_index]
-                        .events_int(&mut self.services)?
+                if model_cold.until_next_event() == 0.0 {
+                    let mut mmodel = self.models.get_mut(&*model_index).ok_or(SimulationError::ModelNotFound)?;
+                    mmodel.events_int(&mut self.services)?
                         .iter()
                         .for_each(|outgoing_message| {
                             let target_tuple = self.get_message_target_tuple(
-                                self.models[model_index].id(), // Outgoing message source model ID
+                                model_index, // Outgoing message source model ID
                                 &outgoing_message.port_name,   // Outgoing message source model port
                             );
                             target_tuple.iter().for_each(|(target_id, target_port)| {
                                 next_messages.push(Message::new(
-                                    self.models[model_index].id().to_string(),
+                                    model_index.to_string(),
                                     outgoing_message.port_name.clone(),
                                     target_id.clone(),
                                     target_port.clone(),
