@@ -305,35 +305,50 @@ impl Simulation {
         let errors: Result<Vec<()>, SimulationError> = model_id_cold
             .iter()
             .map(|model_index| -> SimulationResult<()> {
+                // before a change happens on model calculate if the model has an event that is due now.
                 let model_cold = self
                     .models
                     .get(&*model_index)
                     .ok_or(SimulationError::ModelNotFound)?;
                 // models filtered to those with eminent next event time.
-                if model_cold.until_next_event() == 0.0 {
-                    let mut mmodel = self
-                        .models
-                        .get_mut(&*model_index)
-                        .ok_or(SimulationError::ModelNotFound)?;
-                    mmodel
-                        .events_int(&mut self.services)?
-                        .iter()
-                        .for_each(|outgoing_message| {
-                            let target_tuple = self.get_message_target_tuple(
-                                model_index,                 // Outgoing message source model ID
-                                &outgoing_message.port_name, // Outgoing message source model port
-                            );
-                            target_tuple.iter().for_each(|(target_id, target_port)| {
-                                next_messages.push(Message::new(
-                                    model_index.to_string(),
-                                    outgoing_message.port_name.clone(),
-                                    target_id.clone(),
-                                    target_port.clone(),
-                                    self.services.global_time(),
-                                    outgoing_message.content.clone(),
-                                ));
+                match model_cold.until_next_event() == 0.0 {
+                    true => {
+                        // Get a mutable reference to the model because `events_int` will cause changes.
+                        let mut mmodel = self
+                            .models
+                            .get_mut(&*model_index)
+                            .ok_or(SimulationError::ModelNotFound)?;
+
+                        mmodel
+                            .events_int(&mut self.services)?
+                            .iter()
+                            //Events_int produces a vector of model messages that must be propagated.
+                            .for_each(|outgoing_message| {
+                                //Using connection information, calculate all the target_id and target_ports
+                                //for a model message that was emitted by events_int.
+                                //there may be multiple targets so this is a vector.
+                                let target_tuple = self.get_message_target_tuple(
+                                    model_index,                 // Outgoing message source model ID
+                                    &outgoing_message.port_name, // Outgoing message source model port
+                                );
+
+                                target_tuple.iter()
+                                    // for each target tuple, create a new Message
+                                    // and push each message onto the 'next_messages' that will become the
+                                    // messages handled in the next step.
+                                    .for_each(|(target_id, target_port)| {
+                                    next_messages.push(Message::new(
+                                        model_index.to_string(),
+                                        outgoing_message.port_name.clone(),
+                                        target_id.clone(),
+                                        target_port.clone(),
+                                        self.services.global_time(),
+                                        outgoing_message.content.clone(),
+                                    ));
+                                });
                             });
-                        });
+                    }
+                    false => {}
                 }
                 Ok(())
             })
