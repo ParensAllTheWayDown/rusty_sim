@@ -299,23 +299,29 @@ impl Simulation {
             .services
             .set_global_time(self.services.global_time() + until_next_event);
 
-        let model_id_cold = &self
-            .models
-            .keys().map(|id| id.clone()).collect_vec();
-        //TODO write this for model HashMap
+        // Not going to add a new model while stepping
+        let model_id_cold = &self.models.keys().map(|id| id.clone()).collect_vec();
+
         let errors: Result<Vec<()>, SimulationError> = model_id_cold
             .iter()
             .map(|model_index| -> SimulationResult<()> {
-                let model_cold = self.models.get(&*model_index).ok_or(SimulationError::ModelNotFound)?;
+                let model_cold = self
+                    .models
+                    .get(&*model_index)
+                    .ok_or(SimulationError::ModelNotFound)?;
                 // models filtered to those with eminent next event time.
                 if model_cold.until_next_event() == 0.0 {
-                    let mut mmodel = self.models.get_mut(&*model_index).ok_or(SimulationError::ModelNotFound)?;
-                    mmodel.events_int(&mut self.services)?
+                    let mut mmodel = self
+                        .models
+                        .get_mut(&*model_index)
+                        .ok_or(SimulationError::ModelNotFound)?;
+                    mmodel
+                        .events_int(&mut self.services)?
                         .iter()
                         .for_each(|outgoing_message| {
                             let target_tuple = self.get_message_target_tuple(
-                                model_index, // Outgoing message source model ID
-                                &outgoing_message.port_name,   // Outgoing message source model port
+                                model_index,                 // Outgoing message source model ID
+                                &outgoing_message.port_name, // Outgoing message source model port
                             );
                             target_tuple.iter().for_each(|(target_id, target_port)| {
                                 next_messages.push(Message::new(
