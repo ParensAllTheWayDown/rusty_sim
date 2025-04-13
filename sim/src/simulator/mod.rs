@@ -285,7 +285,7 @@ impl Simulation {
     /// output.
     pub fn step(&mut self) -> SimulationResult<MessageCollectionType> {
         // Process external events
-        &self.handle_messages(self.messages.clone())?;
+        let _ = &self.handle_messages(self.messages.clone())?;
 
         // Process internal events and gather associated messages
         let until_next_event: f64 = match self.messages.is_empty() {
