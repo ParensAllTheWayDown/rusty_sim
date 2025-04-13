@@ -232,18 +232,14 @@ impl Simulation {
     pub fn handle_messages(&mut self, messages: MessageCollectionType) -> SimulationResult<()> {
         messages.iter().try_for_each(|msg| {
             let mut services = self.services.clone();
-            self.models
-                .iter_mut()
-                .try_for_each(|(id, m)| match m.id() == msg.target_id() {
-                    true => m.events_ext(
-                        &ModelMessage {
-                            port_name: msg.target_port().to_string(),
-                            content: msg.content().to_string(),
-                        },
-                        &mut services,
-                    ),
-                    false => Ok(()),
-                })
+            let mut model = self.get_model_mut(msg.target_id())?;
+            model.events_ext(
+                &ModelMessage {
+                    port_name: msg.target_port().to_string(),
+                    content: msg.content().to_string(),
+                },
+                &mut services,
+            )
         })
     }
 
@@ -302,90 +298,40 @@ impl Simulation {
         &self
             .services
             .set_global_time(self.services.global_time() + until_next_event);
-        //
-        // let mut local_models = self.models.clone();
-        //
-        // // Find all the models that produce some messages that need to be handled.
-        // // narrowed down to only the models that actually produce new messages.
-        // let message_model_hash: HashMap<&String, SimulationResult<Vec<ModelMessage>>> =
-        //     local_models
-        //         .iter_mut()
-        //         .filter_map(
-        //             |(model_id, model)| match &model.until_next_event() == &0.0f64 {
-        //                 false => None,
-        //                 true => Some((model_id, model.events_int(&mut self.services))),
-        //             },
-        //         )
-        //         .collect();
-        //
-        // // now that we have a hash map of model_id and model_messages.  Convert ModelMessage to
-        // // Messages and collect them
-        // message_model_hash
-        //     .iter()
-        //     .for_each(|(model_id, model_message)| {
-        //         info!(
-        //             "Model_id:{:?}, model_messages:{:?}",
-        //             model_id, &model_message
-        //         );
-        //         match model_message {
-        //             Ok(mml) => mml.iter().for_each(|mm| {
-        //                 self.get_message_target_tuple(model_id, &*mm.port_name)
-        //                     .iter()
-        //                     .for_each(|(target_id, target_port)| {
-        //                         next_messages.push(Message::new(
-        //                             model_id.to_string(),
-        //                             mm.port_name.clone(),
-        //                             target_id.clone(),
-        //                             target_port.clone(),
-        //                             self.services.global_time(),
-        //                             mm.content.clone(),
-        //                         ))
-        //                     });
-        //             }),
-        //             Err(e) => (),
-        //         }
-        //     });
 
-        //Forced into this approach because of return type on 'events_int'
-        //Have to flatten without being able to use flatten on the return time from 'events_int'
-        //The way to flatten without a flatten is to use an empty vec and push into it.
-        let cold_model_ids = &self.models.keys().cloned().collect_vec();
-        let _ = cold_model_ids.iter().map(|(model_id)| {
-            // models filtered to those with eminent next event time.
-            match self.models.get(model_id) {
-                None => Err(SimulationError::ModelNotFound),
-                Some(model) => {
-                    if &model.until_next_event() == &0.0f64 {
-                        let mut mut_model = self
-                            .models
-                            .get_mut(model_id)
-                            .ok_or(SimulationError::ModelNotFound)?;
-                        let result: SimulationResult<Vec<ModelMessage>> =
-                            mut_model.events_int(&mut self.services);
-                        // now what to do with the result?
-                        result.iter().for_each(|outgoing_messages| {
-                            outgoing_messages.iter().for_each(|outgoing_message| {
-                                let target_tuple = self.get_message_target_tuple(
-                                    &model_id,                   // Outgoing message source model ID
-                                    &outgoing_message.port_name, // Outgoing message source model port
-                                );
-                                target_tuple.iter().for_each(|(target_id, target_port)| {
-                                    next_messages.push(Message::new(
-                                        model_id.to_string(),
-                                        outgoing_message.port_name.clone(),
-                                        target_id.clone(),
-                                        target_port.clone(),
-                                        self.services.global_time(),
-                                        outgoing_message.content.clone(),
-                                    ));
-                                });
+        //TODO write this for model HashMap
+        let errors: Result<Vec<()>, SimulationError> = self
+            .models
+            .keys()
+            .collect_vec()
+            .iter()
+            .map(|model_index| -> SimulationResult<()> {
+                // models filtered to those with eminent next event time.
+                if self.models[model_index].until_next_event() == 0.0 {
+                    self.models[model_index]
+                        .events_int(&mut self.services)?
+                        .iter()
+                        .for_each(|outgoing_message| {
+                            let target_tuple = self.get_message_target_tuple(
+                                self.models[model_index].id(), // Outgoing message source model ID
+                                &outgoing_message.port_name,   // Outgoing message source model port
+                            );
+                            target_tuple.iter().for_each(|(target_id, target_port)| {
+                                next_messages.push(Message::new(
+                                    self.models[model_index].id().to_string(),
+                                    outgoing_message.port_name.clone(),
+                                    target_id.clone(),
+                                    target_port.clone(),
+                                    self.services.global_time(),
+                                    outgoing_message.content.clone(),
+                                ));
                             });
                         });
-                    }
-                    Ok(())
                 }
-            }
-        });
+                Ok(())
+            })
+            .collect();
+        errors?;
         self.messages = next_messages;
         Ok(self.get_messages().clone())
     }
