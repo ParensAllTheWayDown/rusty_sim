@@ -284,7 +284,6 @@ impl Simulation {
     /// message orchestration, global time accounting, and step messages
     /// output.
     pub fn step(&mut self) -> SimulationResult<MessageCollectionType> {
-        let mut next_messages: MessageCollectionType = Vec::new();
         // Process external events
         &self.handle_messages(self.messages.clone())?;
 
@@ -302,6 +301,8 @@ impl Simulation {
         // Not going to add a new model while stepping
         let model_id_cold = &self.models.keys().map(|id| id.clone()).collect_vec();
 
+        //this is really a shame. Can't seem to resolve the next_messages by flattening...
+        let mut next_messages: MessageCollectionType = Vec::new();
         let errors: Result<Vec<()>, SimulationError> = model_id_cold
             .iter()
             .map(|model_index| -> SimulationResult<()> {
@@ -311,7 +312,7 @@ impl Simulation {
                     .get(&*model_index)
                     .ok_or(SimulationError::ModelNotFound)?;
                 // models filtered to those with eminent next event time.
-                match model_cold.until_next_event() == 0.0 {
+                match model_cold.until_next_event() == 0.0f64 {
                     true => {
                         // Get a mutable reference to the model because `events_int` will cause changes.
                         let mut mmodel = self
