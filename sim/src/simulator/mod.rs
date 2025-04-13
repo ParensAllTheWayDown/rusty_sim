@@ -14,14 +14,15 @@
 //! return the messages generated during the execution of the simulation
 //! step(s), for use in message analysis.
 
-use itertools::Itertools;
-use serde::{Deserialize, Serialize};
-use std::collections::{HashMap};
 use crate::input_modeling::dyn_rng;
 use crate::input_modeling::dynamic_rng::SimulationRng;
 use crate::models::{DevsModel, Model, ModelMessage, ModelRecord, Reportable};
 use crate::utils::errors::{SimulationError, SimulationResult};
 use crate::utils::set_panic_hook;
+use itertools::{process_results, Itertools};
+use log::info;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 pub mod coupling;
 pub mod services;
@@ -35,7 +36,7 @@ pub use self::web::Simulation as WebSimulation;
 /// needed to run a simulation - models, connectors, and a random number
 /// generator.  State information, specifically global time and active
 /// messages are additionally retained in the struct.
-/// 
+///
 pub type ModelCollectionType = HashMap<String, Model>;
 pub type ConnectorCollectionType = Vec<Connector>;
 pub type MessageCollectionType = Vec<Message>;
@@ -55,12 +56,15 @@ impl Simulation {
     pub fn post(models: Vec<Model>, connectors: ConnectorCollectionType) -> Self {
         set_panic_hook();
         Self {
-            models: models.iter().map(|m|(m.id().to_string(), m.clone())).collect(),
+            models: models
+                .iter()
+                .map(|m| (m.id().to_string(), m.clone()))
+                .collect(),
             connectors,
             ..Self::default()
         }
     }
-    
+
     pub fn post_hd(models: ModelCollectionType, connectors: ConnectorCollectionType) -> Self {
         set_panic_hook();
         Self {
@@ -95,15 +99,17 @@ impl Simulation {
 
     /// This method sets the models and connectors of an existing simulation.
     pub fn put(&mut self, models: Vec<Model>, connectors: ConnectorCollectionType) {
-        self.models = models.iter().map(|m|(m.id().to_string(), m.clone())).collect();
+        self.models = models
+            .iter()
+            .map(|m| (m.id().to_string(), m.clone()))
+            .collect();
         self.connectors = connectors;
     }
-    
+
     pub fn put_hm(&mut self, models: ModelCollectionType, connectors: ConnectorCollectionType) {
         self.models = models;
         self.connectors = connectors;
     }
-    
 
     /// Simulation steps generate messages, which are then consumed on
     /// subsequent simulation steps.  These messages between models in a
@@ -125,14 +131,22 @@ impl Simulation {
     /// in a simulation.  The method takes the model ID as an argument, and
     /// returns the current status string for that model.
     pub fn get_status(&self, model_id: &str) -> Result<String, SimulationError> {
-        Ok(self.models.get(model_id).ok_or(SimulationError::ModelNotFound)?.status())
+        Ok(self
+            .models
+            .get(model_id)
+            .ok_or(SimulationError::ModelNotFound)?
+            .status())
     }
 
     /// This method provides a mechanism for getting the records of any model
     /// in a simulation.  The method takes the model ID as an argument, and
     /// returns the records for that model.
     pub fn get_records(&self, model_id: &str) -> Result<&Vec<ModelRecord>, SimulationError> {
-        Ok(self.models.get(model_id).ok_or(SimulationError::ModelNotFound)?.records())
+        Ok(self
+            .models
+            .get(model_id)
+            .ok_or(SimulationError::ModelNotFound)?
+            .records())
     }
 
     /// To enable simulation replications, the reset method resets the state
@@ -160,14 +174,14 @@ impl Simulation {
     }
 
     pub fn get_model_mut(&mut self, model_id: &str) -> SimulationResult<&mut Model> {
-        self.models.get_mut(model_id).ok_or(SimulationError::ModelNotFound)
+        self.models
+            .get_mut(model_id)
+            .ok_or(SimulationError::ModelNotFound)
     }
 
     pub fn get_connectors(&self) -> &[Connector] {
         &self.connectors
     }
-
-
 
     fn get_message_target_tuple(
         &self,
@@ -202,7 +216,7 @@ impl Simulation {
     pub fn until_next_event(&self) -> f64 {
         self.models
             .iter()
-            .map(|(id,model)| model.until_next_event())
+            .map(|(id, model)| model.until_next_event())
             .reduce(f64::min)
             .unwrap()
             .min(f64::INFINITY)
@@ -210,8 +224,9 @@ impl Simulation {
 
     /// advance the time for all models in the simulation
     pub fn time_advance(&mut self, time_delta: f64) {
-        self.models.iter_mut()
-            .for_each(|(id,model)| model.time_advance(time_delta))
+        self.models
+            .iter_mut()
+            .for_each(|(id, model)| model.time_advance(time_delta))
     }
 
     pub fn handle_messages(&mut self, messages: MessageCollectionType) -> SimulationResult<()> {
@@ -219,7 +234,7 @@ impl Simulation {
             let mut services = self.services.clone();
             self.models
                 .iter_mut()
-                .try_for_each(|(id,m)| match m.id() == msg.target_id() {
+                .try_for_each(|(id, m)| match m.id() == msg.target_id() {
                     true => m.events_ext(
                         &ModelMessage {
                             port_name: msg.target_port().to_string(),
@@ -282,97 +297,95 @@ impl Simulation {
             true => self.until_next_event(),
             _ => 0.0f64,
         };
-        self.time_advance(until_next_event);
+        &self.time_advance(until_next_event);
 
-        self.services
+        &self
+            .services
             .set_global_time(self.services.global_time() + until_next_event);
-
-        let mut local_models = self.models.clone();
-
-        // Find all the models that produce some messages that need to be handled.
-        // narrowed down to only the models that actually produce new messages.
-        let message_model_hash: HashMap<&String, SimulationResult<Vec<ModelMessage>>> = local_models
-            .iter_mut()
-            .filter_map(|(model_id, model)| match &model.until_next_event() == &0.0f64 {
-                false => None,
-                true => {
-                    let new_model_messages = model.events_int(&mut self.services);
-                    match new_model_messages {
-                        Ok(new_model_messages) => match new_model_messages.len() {
-                            0 => None,
-                            _ => Some((model_id, Ok(new_model_messages)))
-                        },
-                        Err(e) => Some((model_id, Err(e)))
-                    }
-                    // Some((model_id, model.events_int(&mut self.services)))
-                },
-            })
-            .collect();
-        
-        // if there are any errors then we should bail at this point.
-        let mmh_safe = message_model_hash.iter()
-            .try_for_each(|(model_id, model_messages)| {
-                match model_messages {
-                    Ok(mm) => Ok(()),
-                    Err(e) => return Err(e)
-                }
-        });
-        
-
-        // now that we have a hash map of model_id and model_messages.  Convert ModelMessage to
-        // Messages and collect them
-        message_model_hash
-            .iter()
-            .for_each(|(model_id, model_message)|
-                match model_message {
-                    Ok(mml) => mml.iter().for_each(|mm| {
-                        self.get_message_target_tuple(model_id, &*mm.port_name)
-                            .iter().for_each(|(target_id, target_port)|{
-                            next_messages.push(Message::new(
-                                model_id.to_string(),
-                                mm.port_name.clone(),
-                                target_id.clone(),
-                                target_port.clone(),
-                                self.services.global_time(),
-                                mm.content.clone(),
-                            ))});
-                    }),
-                    Err(e) => () 
-                });
-
-
+        //
+        // let mut local_models = self.models.clone();
+        //
+        // // Find all the models that produce some messages that need to be handled.
+        // // narrowed down to only the models that actually produce new messages.
+        // let message_model_hash: HashMap<&String, SimulationResult<Vec<ModelMessage>>> =
+        //     local_models
+        //         .iter_mut()
+        //         .filter_map(
+        //             |(model_id, model)| match &model.until_next_event() == &0.0f64 {
+        //                 false => None,
+        //                 true => Some((model_id, model.events_int(&mut self.services))),
+        //             },
+        //         )
+        //         .collect();
+        //
+        // // now that we have a hash map of model_id and model_messages.  Convert ModelMessage to
+        // // Messages and collect them
+        // message_model_hash
+        //     .iter()
+        //     .for_each(|(model_id, model_message)| {
+        //         info!(
+        //             "Model_id:{:?}, model_messages:{:?}",
+        //             model_id, &model_message
+        //         );
+        //         match model_message {
+        //             Ok(mml) => mml.iter().for_each(|mm| {
+        //                 self.get_message_target_tuple(model_id, &*mm.port_name)
+        //                     .iter()
+        //                     .for_each(|(target_id, target_port)| {
+        //                         next_messages.push(Message::new(
+        //                             model_id.to_string(),
+        //                             mm.port_name.clone(),
+        //                             target_id.clone(),
+        //                             target_port.clone(),
+        //                             self.services.global_time(),
+        //                             mm.content.clone(),
+        //                         ))
+        //                     });
+        //             }),
+        //             Err(e) => (),
+        //         }
+        //     });
 
         //Forced into this approach because of return type on 'events_int'
         //Have to flatten without being able to use flatten on the return time from 'events_int'
         //The way to flatten without a flatten is to use an empty vec and push into it.
-        // let errors: Result<Vec<()>, SimulationError> = (0..self.models.len())
-        //     .map(|model_index| -> SimulationResult<()> {
-        //         // models filtered to those with eminent next event time.
-        //         if self.models[model_index].until_next_event() == 0.0 {
-        //             self.models[model_index]
-        //                 .events_int(&mut self.services)?
-        //                 .iter()
-        //                 .for_each(|outgoing_message| {
-        //                     let target_tuple = self.get_message_target_tuple(
-        //                         self.models[model_index].id(), // Outgoing message source model ID
-        //                         &outgoing_message.port_name,   // Outgoing message source model port
-        //                     );
-        //                     target_tuple.iter().for_each(|(target_id, target_port)| {
-        //                         next_messages.push(Message::new(
-        //                             self.models[model_index].id().to_string(),
-        //                             outgoing_message.port_name.clone(),
-        //                             target_id.clone(),
-        //                             target_port.clone(),
-        //                             self.services.global_time(),
-        //                             outgoing_message.content.clone(),
-        //                         ));
-        //                     });
-        //                 });
-        //         }
-        //         Ok(())
-        //     })
-        //     .collect();
-        // errors?;
+        let cold_model_ids = &self.models.keys().cloned().collect_vec();
+        let _ = cold_model_ids.iter().map(|(model_id)| {
+            // models filtered to those with eminent next event time.
+            match self.models.get(model_id) {
+                None => Err(SimulationError::ModelNotFound),
+                Some(model) => {
+                    if &model.until_next_event() == &0.0f64 {
+                        let mut mut_model = self
+                            .models
+                            .get_mut(model_id)
+                            .ok_or(SimulationError::ModelNotFound)?;
+                        let result: SimulationResult<Vec<ModelMessage>> =
+                            mut_model.events_int(&mut self.services);
+                        // now what to do with the result?
+                        result.iter().for_each(|outgoing_messages| {
+                            outgoing_messages.iter().for_each(|outgoing_message| {
+                                let target_tuple = self.get_message_target_tuple(
+                                    &model_id,                   // Outgoing message source model ID
+                                    &outgoing_message.port_name, // Outgoing message source model port
+                                );
+                                target_tuple.iter().for_each(|(target_id, target_port)| {
+                                    next_messages.push(Message::new(
+                                        model_id.to_string(),
+                                        outgoing_message.port_name.clone(),
+                                        target_id.clone(),
+                                        target_port.clone(),
+                                        self.services.global_time(),
+                                        outgoing_message.content.clone(),
+                                    ));
+                                });
+                            });
+                        });
+                    }
+                    Ok(())
+                }
+            }
+        });
         self.messages = next_messages;
         Ok(self.get_messages().clone())
     }
