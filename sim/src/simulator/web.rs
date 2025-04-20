@@ -1,7 +1,8 @@
 use js_sys::Array;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
-
+use log::{error, info, warn};
+use wasm_bindgen_console_logger::DEFAULT_LOGGER;
 use crate::utils::set_panic_hook;
 
 use super::Simulation as CoreSimulation;
@@ -16,8 +17,29 @@ pub struct Simulation {
     simulation: CoreSimulation,
 }
 
+
+#[wasm_bindgen]
+pub fn start() {
+    log::set_logger(&DEFAULT_LOGGER).unwrap();
+    log::set_max_level(log::LevelFilter::Info);
+
+    error!("Error message");
+    warn!("Warning message");
+    info!("Informational message");
+}
+
 #[wasm_bindgen]
 impl Simulation {
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> Self {
+        info!("Simulation::new");
+        set_panic_hook();
+        Self {
+            simulation: CoreSimulation::default(),
+        }
+    }
+
+
     /// A JS/WASM interface for `Simulation.post`, which uses JSON
     /// representations of the simulation models and connectors.
     pub fn post_json(models: &str, connectors: &str) -> Self {
@@ -46,6 +68,7 @@ impl Simulation {
 
     /// A JS/WASM interface for `Simulation.post`, which uses YAML
     /// representations of the simulation models and connectors.
+    // #[wasm_bindgen(constructor)]
     pub fn post_yaml(models: &str, connectors: &str) -> Simulation {
         set_panic_hook();
         Self {
