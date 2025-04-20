@@ -18,6 +18,7 @@ pub struct Simulation {
 }
 
 
+/// Initialize logging functions and send one to each level.
 #[wasm_bindgen]
 pub fn start() {
     log::set_logger(&DEFAULT_LOGGER).unwrap();
@@ -30,12 +31,16 @@ pub fn start() {
 
 #[wasm_bindgen]
 impl Simulation {
+    ///the constructor method has to be called `new`
     #[wasm_bindgen(constructor)]
-    pub fn new() -> Self {
+    pub fn new(models: &str, connectors: &str) -> Self {
         info!("Simulation::new");
         set_panic_hook();
         Self {
-            simulation: CoreSimulation::default(),
+            simulation: CoreSimulation::post(
+                serde_json::from_str(models).unwrap(),
+                serde_json::from_str(connectors).unwrap(),
+            ),
         }
     }
 
