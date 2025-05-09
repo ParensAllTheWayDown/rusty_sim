@@ -22,3 +22,5 @@ pub mod simulator;
 pub mod utils;
 
 pub mod checker;
+
+pub mod report;

@@ -332,7 +332,7 @@ impl Simulation {
                                     model_index,                 // Outgoing message source model ID
                                     &outgoing_message.port_name, // Outgoing message source model port
                                 );
-                                
+
                                 // we know that next_messages will be grown by each item in target_tuple
                                 // so use an extend to add them all.
                                 next_messages.extend(

@@ -8,23 +8,39 @@ use std::io::Write;
 use sim::checker::Checker;
 use sim::input_modeling::ContinuousRandomVariable;
 use sim::models::{Generator, Model, Processor, Storage};
+use sim::report::Report;
 use sim::simulator::{Connector, Message, Simulation};
 
 #[test]
+fn test_ping_pong_report() {
+    let (initial_messages, simulation) = ping_pong_sim();
+    let graph = simulation.generate_dot_graph();
+    info!("graph: {}", graph);
+}
+#[test]
 fn test_ping_pong() {
-    Builder::new()
-        .format(|buf, record| {
-            writeln!(
-                buf,
-                "{} [{}] - {}",
-                Local::now().format("%Y-%m-%dT%H:%M:%S"),
-                record.level(),
-                record.args()
-            )
-        })
-        .filter(None, LevelFilter::Info)
-        .init();
+    let (initial_messages, mut simulation) = ping_pong_sim();
 
+    initial_messages.iter().for_each(|m| {
+        info!("injecting intial messages: {:?}", m);
+        simulation.inject_input(m.clone())
+    });
+
+    info!("Checking simulation configuration...");
+    // Check the simulation configuration to verify that it is usable.
+    match simulation.check() {
+        Ok(_) => info!("Simulation checks complete"),
+        Err(msg) => {
+            error!("Check failed: {}", msg);
+            assert!(false);
+        }
+    }
+    let msgs = simulation.step_until(100.0).unwrap();
+    info!("msgs: {:?}", msgs);
+    info!("Sim State: {}", serde_json::to_string(&simulation).unwrap());
+}
+
+fn ping_pong_sim() -> ([Message; 1], Simulation) {
     let models = [
         Model::new(
             String::from("player-01"),
@@ -76,23 +92,6 @@ fn test_ping_pong() {
         "Ball".to_string(),
     )];
 
-    let mut simulation = Simulation::post(models.to_vec(), connectors.to_vec());
-
-    initial_messages.iter().for_each(|m| {
-        info!("injecting intial messages: {:?}", m);
-        simulation.inject_input(m.clone())
-    });
-
-    info!("Checking simulation configuration...");
-    // Check the simulation configuration to verify that it is usable.
-    match simulation.check() {
-        Ok(_) => info!("Simulation checks complete"),
-        Err(msg) => {
-            error!("Check failed: {}", msg);
-            assert!(false);
-        }
-    }
-    let msgs = simulation.step_until(100.0).unwrap();
-    info!("msgs: {:?}", msgs);
-    info!("Sim State: {}", serde_json::to_string(&simulation).unwrap());
+    let simulation = Simulation::post(models.to_vec(), connectors.to_vec());
+    (initial_messages, simulation)
 }
