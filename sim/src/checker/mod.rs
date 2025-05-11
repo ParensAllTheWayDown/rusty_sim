@@ -22,25 +22,7 @@ impl Checker for Simulation {
     fn check(&self) -> SimulationResult<()> {
         //Check all of the contained checks.  if any return an error result then bail.
         //was hoping I could do something fancy with method pointers, but not so luck...
-
-        //ugh frustrating.  Something like itertools::process_results might work but not going to spend more time on this
-        
-        let a = self.connectors_source_to_model();
-        let b = self.connectors_target_to_model();
-        let c = self.valid_messages();
-        
-        
-        match a {
-            Ok(_) => match b {
-                Ok(_) => match c {
-                    Ok(_) => Ok(()),
-                    Err(e) => Err(e)
-                },
-                Err(e) => Err(e)
-            },
-            Err(e) => Err(e)
-        }
-    }
+        self.connectors_source_to_model().and(self.connectors_target_to_model()).and( self.valid_messages())}
 
     fn connectors_source_to_model(&self) -> SimulationResult<()> {
         self.get_connectors().iter().try_for_each(|connector| {
